@@ -6,25 +6,44 @@ import {
   Select,
   MenuItem,
   Slider,
-  Paper
+  Paper,
+  Alert
 } from "@mui/material";
 
-const text =
-  "India is advancing clean electricity solutions to support sustainable development and rural empowerment. \n"
-+ "Renewable energy sources such as solar, wind, and hydro power play a vital role in reducing carbon emissions\n "
-+ "and improving energy security. Government initiatives and community participation are essential to ensure \n"
-+ "that clean energy reaches rural and underserved regions. By adopting innovative technologies and inclusive \n"
-+ "policies, India aims to build a resilient, sustainable, and self-reliant energy ecosystem for future generations.";
+/* Language-specific content */
+const textMap = {
+  "en-IN":
+    "India is advancing clean electricity solutions to support sustainable development and rural empowerment. \n" +
+    "Renewable energy sources such as solar, wind, and hydro power play a vital role in reducing carbon emissions \n" +
+    "and improving energy security. Government initiatives and community participation are essential to ensure \n" +
+    "that clean energy reaches rural and underserved regions.",
+
+  "hi-IN":
+    "भारत सतत विकास और ग्रामीण सशक्तिकरण के समर्थन के लिए स्वच्छ ऊर्जा समाधानों को आगे बढ़ा रहा है। " +
+    "सौर, पवन और जल विद्युत जैसे नवीकरणीय ऊर्जा स्रोत कार्बन उत्सर्जन को कम करने और ऊर्जा सुरक्षा में " +
+    "महत्वपूर्ण भूमिका निभाते हैं। स्वच्छ ऊर्जा को ग्रामीण और वंचित क्षेत्रों तक पहुँचाने के लिए सरकारी " +
+    "पहल और सामुदायिक भागीदारी आवश्यक है।"
+};
+
+const FALLBACK_LANGS = ["gu-IN", "mr-IN", "ta-IN", "te-IN"];
 
 function App() {
-  const [activeIndex, setActiveIndex] = useState(null);
   const [language, setLanguage] = useState("en-IN");
   const [rate, setRate] = useState(1);
   const [voices, setVoices] = useState([]);
+  const [activeIndex, setActiveIndex] = useState(null);
+  const [showFallback, setShowFallback] = useState(false);
 
   const utteranceRef = useRef(null);
+  const timerRef = useRef(null);
+
+  const isFallback = FALLBACK_LANGS.includes(language);
+  const effectiveLang = isFallback ? "en-IN" : language;
+
+  const text = textMap[effectiveLang];
   const words = text.split(" ");
 
+  /* Load voices */
   useEffect(() => {
     const loadVoices = () => {
       setVoices(window.speechSynthesis.getVoices());
@@ -33,34 +52,53 @@ function App() {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  const getVoiceForLanguage = (lang) => {
-    let voice = voices.find((v) => v.lang === lang);
-    if (!voice) {
-      voice = voices.find((v) => v.lang.startsWith("en"));
-      alert(`Voice for ${lang} not available. Falling back to English.`);
-    }
-    return voice;
-  };
+  /* Handle fallback notice */
+  useEffect(() => {
+    setShowFallback(isFallback);
+  }, [language]);
+
+  const getVoiceForLanguage = (lang) =>
+    voices.find((v) => v.lang === lang);
 
   const playSpeech = () => {
     window.speechSynthesis.cancel();
+    clearInterval(timerRef.current);
+    setActiveIndex(null);
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = language;
+    utterance.lang = effectiveLang;
     utterance.rate = rate;
 
-    const voice = getVoiceForLanguage(language);
+    const voice = getVoiceForLanguage(effectiveLang);
     if (voice) utterance.voice = voice;
 
-    utterance.onboundary = (event) => {
-      if (event.name === "word") {
-        const index =
-          text.substring(0, event.charIndex).split(" ").length - 1;
-        setActiveIndex(index);
-      }
-    };
+    /* English → native boundary */
+    if (effectiveLang === "en-IN") {
+      utterance.onboundary = (event) => {
+        if (event.name === "word") {
+          const index =
+            text.substring(0, event.charIndex).split(" ").length - 1;
+          setActiveIndex(index);
+        }
+      };
+    }
 
-    utterance.onend = () => setActiveIndex(null);
+    /* Hindi → simulated highlighting */
+    if (effectiveLang === "hi-IN") {
+      let index = 0;
+      timerRef.current = setInterval(() => {
+        setActiveIndex(index);
+        index++;
+        if (index >= words.length) {
+          clearInterval(timerRef.current);
+        }
+      }, 400 / rate);
+    }
+
+    utterance.onend = () => {
+      clearInterval(timerRef.current);
+      setActiveIndex(null);
+    };
 
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
@@ -70,6 +108,7 @@ function App() {
   const resumeSpeech = () => window.speechSynthesis.resume();
   const stopSpeech = () => {
     window.speechSynthesis.cancel();
+    clearInterval(timerRef.current);
     setActiveIndex(null);
   };
 
@@ -80,20 +119,23 @@ function App() {
         bgcolor: "#fafafa",
         display: "flex",
         justifyContent: "center",
-        alignItems: "flex-start",
         p: 2
       }}
     >
       <Paper sx={{ maxWidth: 900, p: 4 }} elevation={1}>
         <Typography variant="h6" gutterBottom>
-          Text-to-Speech Reader
+          Synchronized Text-to-Speech Reader
         </Typography>
 
-        {/* Reader Text */}
-        <Typography
-          component="div"
-          sx={{ fontSize: "1.1rem", lineHeight: 1.8, mb: 4 }}
-        >
+        {showFallback && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Selected language voice boundary support is limited.
+            Falling back to English for synchronized highlighting.
+          </Alert>
+        )}
+
+        {/* Text */}
+        <Typography component="div" sx={{ lineHeight: 1.9, mb: 4 }}>
           {words.map((word, index) => (
             <span
               key={index}
@@ -120,7 +162,7 @@ function App() {
           <Button onClick={stopSpeech}>Stop</Button>
         </Box>
 
-        {/* Settings */}
+        {/* Language */}
         <Box sx={{ mb: 2 }}>
           <Typography gutterBottom>Language</Typography>
           <Select
@@ -137,6 +179,7 @@ function App() {
           </Select>
         </Box>
 
+        {/* Rate */}
         <Box>
           <Typography gutterBottom>Speech Rate</Typography>
           <Slider
