@@ -21,8 +21,16 @@ multiple Indian languages using the Web Speech API.
 
 --KNOWN LIMITATIONS--
 
-- Availability of Indian language voices depends on browser and operating system.
-- Word-level highlighting is inconsistent on mobile browsers.
-- Edge does not support TTS,UI Responsive.
-- Firefox and Safari have limited support for the Web Speech API.
+1.Word-level text highlighting relies on the onboundary event, which is inconsistently supported across browsers and operating systems.
 
+2.English (en-IN) provides reliable word-boundary events and synchronized highlighting on Google Chrome (Desktop).
+
+3.Hindi (hi-IN) highlighting is implemented using a timing-based simulation due to the lack of reliable boundary events; basic synchronization is achieved, but precise pause–resume alignment may drift.
+
+4.Indian language voices (Gujarati, Marathi, Tamil, Telugu) do not consistently expose boundary events, so synchronized highlighting is not feasible; a graceful fallback to English highlighting is applied.
+
+5.On mobile browsers (Android / iOS), TTS playback works but text highlighting synchronization is unreliable due to platform-level speech engine limitations.
+
+6.Microsoft Edge renders the UI correctly and supports basic TTS playback, but word highlighting events are not triggered reliably.
+
+7.Firefox and Safari have limited or partial support for the Web Speech API, especially for boundary-based synchronization.
